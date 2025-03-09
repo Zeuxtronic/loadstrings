@@ -34,80 +34,6 @@ Explorer = function()
 
 -- Common Locals
 
-local Decompile do
-	local Success, Decompile_Source = pcall(function()
-		return game:HttpGet("https://raw.githubusercontent.com/w-a-e/Advanced-Decompiler-V3/main/init.lua", true)
-	end)
-	
-	if Success then
-		local CONSTANTS = [[
-local ENABLED_REMARKS = {
-	NATIVE_REMARK = true,
-	INLINE_REMARK = true
-}
-
-local DECOMPILER_TIMEOUT = 10
-
-local READER_FLOAT_PRECISION = 7 -- up to 99
-local SHOW_INSTRUCTION_LINES = false
-local SHOW_REFERENCES = true
-local SHOW_OPERATION_NAMES = false
-local SHOW_MISC_OPERATIONS = false
-local LIST_USED_GLOBALS = true
-local RETURN_ELAPSED_TIME = false]]
-		
-		xpcall(function()
-			return loadstring(
-				string.gsub(
-					string.gsub(
-						Decompile_Source, "return %(x %% 2^32%) // %(2^disp%)", "return math.floor((x %% 2^32) / (2^disp))", 1
-					), ";;CONSTANTS HERE;;", CONSTANTS
-				), "Advanced-Decompiler-V3"
-			)()
-		end, warn)
-		
-		-- local HttpService = service.HttpService
-		
-		local _ENV = (getgenv or getrenv or getfenv)()
-		Decompile = _ENV.decompile
-		
-		--[[local request = request or http_request or (syn and syn.request)
-		
-		local cleanScript = function(ucScript, cUrl)
-			local Url = (cUrl or "http://localhost:5000/fix_script")
-			
-			local result = request({
-				Url = Url,
-				Method = "POST",
-				Headers = { ["Content-Type"] = "application/json" },
-				Body = HttpService:JSONEncode({ script = ucScript })
-			})
-			
-			return (result.Success and result.fixed_script) or nil
-		end
-		
-		local BetterDecompiler = function(Source, Enabled, cUrl)
-			local Success, result = pcall(function()
-				return Decompile(Source)
-			end)
-			
-			if Success and result then
-				if Enabled then
-					local _Success, _result = pcall(cleanScript, Source, cUrl)
-					
-					if _Success and _result then
-						return _result
-					end
-				end
-				return result
-			end
-		end
-		
-		_ENV.decompile = function(Source)
-			return BetterDecompiler(Source, true)
-		end]]
-	end
-end
 
 local Main,Lib,Apps,Settings -- Main Containers
 local Explorer, Properties, ScriptViewer, Notebook -- Major Apps
@@ -1023,8 +949,12 @@ local function main()
 		end
 		if presentClasses["LuaSourceContainer"] then
 			context:AddRegistered("VIEW_SCRIPT")
+   			context:AddRegistered("GETSENV_SCRIPT")
 			context:AddRegistered("SAVE_BYTECODE")
 		end
+		if presentClasses["Tool"] then
+      		context:AddRegistered("PICKUP_TOOL")
+      	end
 		
 		if sMap[nilNode] then
 			context:AddRegistered("REFRESH_NIL")
@@ -1420,10 +1350,6 @@ local function main()
 			
 		end})
 		
-		--[[context:Register("VIEW_CONNECTIONS",{Name = "View Connections", OnClick = function()
-			
-		end})]]
-		
 		context:Register("VIEW_API",{Name = "View API Page", IconMap = Explorer.MiscIcons, Icon = "Reference", OnClick = function()
 			
 		end})
@@ -1465,6 +1391,22 @@ local function main()
 		context:Register("VIEW_SCRIPT",{Name = "View Script", IconMap = Explorer.MiscIcons, Icon = "ViewScript", OnClick = function()
 			local scr = selection.List[1] and selection.List[1].Obj
 			if scr then ScriptViewer.ViewScript(scr) end
+		end})
+
+		context:Register("PICKUP_TOOL",{Name = "Pickup Tool", IconMap = Explorer.MiscIcons, Icon = "ViewScript", OnClick = function()
+			game.Players.LocalPlayer.character.Humanoid:EquipTool(selection.List[1].Obj)
+		end})
+
+		context:Register("GETSENV_SCRIPT",{Name = "Getsenv Script", IconMap = Explorer.MiscIcons, Icon = "ViewScript", OnClick = function()
+          	local scr = selection.List[1] and selection.List[1].Obj
+          	local senv = getsenv(scr)
+          	local stringgetsenv = ""
+           	for i,v in pairs(senv) do
+                stringgetsenv = stringgetsenv.."\n"..i.." = "..tostring(v)
+            end
+          
+			
+			if scr then ScriptViewer.ViewScript(nil,true,stringgetsenv) end
 		end})
 		
 		context:Register("SAVE_BYTECODE",{Name = "Save ScriptBytecode in Files", IconMap = Explorer.MiscIcons, Icon = "Save", OnClick = function()
@@ -4292,9 +4234,16 @@ local function main()
 	local window, codeFrame
 	local PreviousScr = nil
 	
-	ScriptViewer.ViewScript = function(scr)
-		local success, source = pcall(decompile or function() end, scr)
-		if not success or not source then source, PreviousScr = "-- DEX - Source failed to decompile", nil else PreviousScr = scr end
+	ScriptViewer.ViewScript = function(scr, rawtext, text)
+     	local rawtext = rawtext or false
+      	local text = text or "lololol"
+     	local success, source = false, ""
+     	if not rawtext then
+			success, source = pcall(decompile or function() end, scr)
+			if not success or not source then source, PreviousScr = "-- DEX - Source failed to decompile", nil else PreviousScr = scr end
+   		else
+     		source = text
+   		end
 		codeFrame:SetText(source:gsub("\0", "\\0"))
 		window:Show()
 	end
