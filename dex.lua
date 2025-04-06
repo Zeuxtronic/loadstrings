@@ -1,12 +1,10 @@
 --[[
-	github: https://github.com/LorekeeperZinnia/Dex
-	
-	New Dex
-	Final Version
-	Developed by Moon
-	Modified for Infinite Yield
-	
-	Dex is a debugging suite designed to help the user debug games and find any potential vulnerabilities.
+	dex is obviously not by me,
+ 	heres the loadstring if you dont want to paste the entire code:
+ 	loadstring(game:HttpGet('https://raw.githubusercontent.com/Zeuxtronic/loadstrings/refs/heads/main/dex.lua'))()
+  
+  	modded to work on mobile by someone else
+   	modded by me (Zeuxtronic) to have some other useful features.
 ]]
 
 	
@@ -21,6 +19,71 @@ local nodes, service = {}, setmetatable({}, {
 		return serv
 	end
 })
+
+local UpString = function(times)
+    local msg = ""
+    for i=1,times do
+        msg = msg.."	"
+    end
+	return msg
+end
+
+Format = function(value)
+    local type = typeof(value)
+    if type == "string" then
+      	local f = ""
+     	for i,v in pairs(string.split(value,"")) do
+        	if v == "\\" or v == "\"" then
+            	f = f.."\\"..v
+           	else
+           		f = f..v
+            end
+        end
+    	return "\""..f.."\""
+    elseif type == "number" then
+    	return tostring(value)
+    elseif type == "boolean" then
+    	return tostring(value)
+    elseif type == "Instance" then
+		return value:GetFullName()
+    elseif type == "table" then
+    	local msg
+     	local myup = tableup
+    	if #value ~= 0 then
+    		tableup = tableup +1
+     		myup = tableup
+    		msg = "{\n"
+    		for i,v in pairs(value) do
+        		msg = msg..UpString(myup).."["..i.."] = "..Format(v)..",".."\n"
+    		end
+       		tableup = tableup -1
+  			return msg..UpString(myup -1).."}"
+	 	else
+ 			msg = "{}"
+    		return msg..UpString(myup -1)
+  		end
+   	elseif type == "Vector3" then
+    	return "Vector3.new("..math.round(value.X)..", "..math.round(value.Y)..", "..math.round(value.Z)..")"
+    elseif type == "Color3" then
+    	return "Color3.fromRGB("..tostring(math.round(value.R *255))..", "..tostring(math.round(value.G *255))..", "..tostring(math.round(value.B *255))..")"
+	elseif type == "CFrame" then
+ 		return tostring(v)
+ 	else
+    	return Format("unknown")
+   	end
+end
+
+Visualize = function(table)
+    tableup = 1
+     
+    local msg = "{\n"
+   	for i,v in pairs(table) do
+        msg = msg..UpString(tableup).."["..i.."] = "..Format(v)..",".."\n"
+    end
+	msg = msg.."}"
+ 	tableup = tableup -1
+ 	return msg
+end
 
 local selection = nil;
 
@@ -884,6 +947,8 @@ local function main()
 		local absoluteSize = context.Gui.AbsoluteSize
 		context.MaxHeight = (absoluteSize.Y <= 600 and (absoluteSize.Y - 40)) or nil
 		context:Clear()
+  
+  		
 		
 		local sList = selection.List
 		local sMap = selection.Map
@@ -901,6 +966,7 @@ local function main()
 				curClass = curClass.Superclass
 			end
 		end
+
 
 		context:AddRegistered("CUT")
 		context:AddRegistered("COPY")
@@ -920,12 +986,6 @@ local function main()
 		context:AddDivider()
 		if expanded == Explorer.SearchExpanded then context:AddRegistered("CLEAR_SEARCH_AND_JUMP_TO") end
 		if env.setclipboard then context:AddRegistered("COPY_PATH") end
-		context:AddRegistered("INSERT_OBJECT")
-		context:AddRegistered("SAVE_INST")
-		context:AddRegistered("CALL_FUNCTION")
-		-- context:AddRegistered("VIEW_CONNECTIONS")
-		context:AddRegistered("GET_REFERENCES")
-		context:AddRegistered("VIEW_API")
 		
 		context:QueueDivider()
 		
@@ -949,8 +1009,12 @@ local function main()
 		end
 		if presentClasses["LuaSourceContainer"] then
 			context:AddRegistered("VIEW_SCRIPT")
-   			context:AddRegistered("GETSENV_SCRIPT")
 			context:AddRegistered("SAVE_BYTECODE")
+   			if presentClasses["LocalScript"] then
+          		context:AddRegistered("GETSENV_SCRIPT")
+            elseif presentClasses["ModuleScript"] then
+            	context:AddRegistered("REQUIRE_SCRIPT")
+         	end
 		end
 		if presentClasses["Tool"] then
       		context:AddRegistered("PICKUP_TOOL")
@@ -1337,22 +1401,6 @@ local function main()
 			local x,y = Explorer.LastRightClickX or mouse.X, Explorer.LastRightClickY or mouse.Y
 			Explorer.InsertObjectContext:Show(x,y)
 		end})
-
-		context:Register("CALL_FUNCTION",{Name = "Call Function", IconMap = Explorer.ClassIcons, Icon = 66, OnClick = function()
-			
-		end})
-
-		context:Register("GET_REFERENCES",{Name = "Get Lua References", IconMap = Explorer.ClassIcons, Icon = 34, OnClick = function()
-			
-		end})
-		
-		context:Register("SAVE_INST",{Name = "Save to File", IconMap = Explorer.MiscIcons, Icon = "Save", OnClick = function()
-			
-		end})
-		
-		context:Register("VIEW_API",{Name = "View API Page", IconMap = Explorer.MiscIcons, Icon = "Reference", OnClick = function()
-			
-		end})
 		
 		context:Register("VIEW_OBJECT",{Name = "View Object (Right click to reset)", IconMap = Explorer.ClassIcons, Icon = 5, OnClick = function()
 			local sList = selection.List
@@ -1399,14 +1447,23 @@ local function main()
 
 		context:Register("GETSENV_SCRIPT",{Name = "Getsenv Script", IconMap = Explorer.MiscIcons, Icon = "ViewScript", OnClick = function()
           	local scr = selection.List[1] and selection.List[1].Obj
-          	local senv = getsenv(scr)
-          	local stringgetsenv = ""
-           	for i,v in pairs(senv) do
-                stringgetsenv = stringgetsenv.."\n"..i.." = "..tostring(v)
+          	local succ,res = pcall(function()
+               Visualize(getsenv(scr))
+            end)	
+        	if succ then
+            	res = Visualize(getsenv(scr))
             end
-          
-			
-			if scr then ScriptViewer.ViewScript(nil,true,stringgetsenv) end
+          	
+			if scr then
+       			ScriptViewer.ViewScript(nil,true,res)
+          	end
+		end})
+
+		context:Register("REQUIRE_SCRIPT",{Name = "Require Script", IconMap = Explorer.MiscIcons, Icon = "ViewScript", OnClick = function()
+          	local scr = selection.List[1] and selection.List[1].Obj
+          	local senv = Visualize(require(scr))
+          	
+			if scr then ScriptViewer.ViewScript(nil,true,senv) end
 		end})
 		
 		context:Register("SAVE_BYTECODE",{Name = "Save ScriptBytecode in Files", IconMap = Explorer.MiscIcons, Icon = "Save", OnClick = function()
@@ -4236,7 +4293,7 @@ local function main()
 	
 	ScriptViewer.ViewScript = function(scr, rawtext, text)
      	local rawtext = rawtext or false
-      	local text = text or "lololol"
+      	local text = text or "-- DEX - No text given."
      	local success, source = false, ""
      	if not rawtext then
 			success, source = pcall(decompile or function() end, scr)
@@ -4244,7 +4301,7 @@ local function main()
    		else
      		source = text
    		end
-		codeFrame:SetText(source:gsub("\0", "\\0"))
+		codeFrame:SetText(source)
 		window:Show()
 	end
 
@@ -8216,11 +8273,12 @@ local function main()
 		end
 		
 		funcs.ConvertText = function(self,text,toEditor)
-			if toEditor then
+			--[[if toEditor then
 				return text:gsub("\t",(" %s%s "):format(tabSub,tabSub))
 			else
 				return text:gsub((" %s%s "):format(tabSub,tabSub),"\t")
-			end
+			end]]
+   			return text
 		end
 
 		funcs.GetText = function(self) -- TODO: better (use new tab format)
